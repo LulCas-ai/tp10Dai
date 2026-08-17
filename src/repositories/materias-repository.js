@@ -1,38 +1,30 @@
-import { DBConfig } from '../configs/db-config.js'; // [IA] Importación estándar del proyecto base
+import Db from './db-pg.js';
 
 export default class MateriasRepository {
-    constructor(db) {
-        // [IA] Recibe la instancia de la base de datos inyectada desde el Server/Service
-        this.db = db; 
+    constructor() {
+        this.db = new Db();
     }
 
-    // [IA] Obtener todas las materias sin filtros
-    async getAllAsync() {
-        const sql = 'SELECT id, nombre, carga_horaria FROM materias ORDER BY id ASC;';
-        const result = await this.db.queryAll(sql);
-        return result;
+    getAllAsync = async () => {
+        const sql = `SELECT * FROM materias ORDER BY id ASC`;
+        return await this.db.queryAll(sql);
     }
 
-    // [IA] Obtener una materia por ID
-    async getByIdAsync(id) {
-        const sql = 'SELECT id, nombre, carga_horaria FROM materias WHERE id = $1;';
-        const result = await this.db.queryOne(sql, [id]);
-        return result;
+    getByIdAsync = async (id) => {
+        const sql = `SELECT * FROM materias WHERE id=$1`;
+        return await this.db.queryOne(sql, [id]);
     }
 
-    // [IA] Creación de una materia retornando el ID generado
-    async createAsync(materia) {
-        const sql = 'INSERT INTO materias (nombre, carga_horaria) VALUES ($1, $2) RETURNING id;';
-        // [YO] Añadí un fallback con operador de coalescencia nula (??) para asegurar valores por defecto
-        const values = [materia.nombre, materia.carga_horaria ?? 0]; 
-        const result = await this.db.queryReturnId(sql, values);
-        return result;
+    createAsync = async (entity) => {
+        const sql = `INSERT INTO materias (nombre, carga_horaria) VALUES ($1, $2) RETURNING id`;
+        const values = [
+            entity?.nombre ?? '',
+            entity?.carga_horaria ?? 0
+        ];
+        return await this.db.queryReturnId(sql, values);
     }
 
-    // [YO] REFACTORIZACIÓN COMPLETA DE LA CONSULTA DINÁMICA
-    // La IA originalmente me había dado un SQL estático que borraba datos si venían vacíos.
-    // Escribí esta lógica para procesar dinámicamente las columnas a actualizar manteniendo la seguridad contra inyecciones SQL.
-    async updateAsync(id, materia) {
+    updateAsync = async (id, materia) => {
         const fields = [];
         const values = [];
         let placeholderIndex = 1;
@@ -49,21 +41,16 @@ export default class MateriasRepository {
             placeholderIndex++;
         }
 
-        // Si no se pasaron campos válidos para actualizar, salimos antes de tocar la BD
-        if (fields.length === 0) return 0; 
+        if (fields.length === 0) return 0;
 
-        // Añadimos el ID al final de la lista de valores para la cláusula WHERE
         values.push(id);
         const sql = `UPDATE materias SET ${fields.join(', ')} WHERE id = $${placeholderIndex};`;
 
-        const result = await this.db.queryRowCount(sql, values);
-        return result; // Retorna la cantidad de filas afectadas (debe ser 1)
+        return await this.db.queryRowCount(sql, values);
     }
 
-    // [IA] Eliminación física de la materia
-    async deleteByIdAsync(id) {
-        const sql = 'DELETE FROM materias WHERE id = $1;';
-        const result = await this.db.queryRowCount(sql, [id]);
-        return result;
+    deleteByIdAsync = async (id) => {
+        const sql = `DELETE FROM materias WHERE id=$1`;
+        return await this.db.queryRowCount(sql, [id]);
     }
 }

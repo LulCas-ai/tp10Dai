@@ -1,0 +1,302 @@
+Actuá como un desarrollador backend senior en Node.js y Express.
+
+Tengo una API REST con arquitectura controller -> service -> repository, usando ES modules y PostgreSQL con `pg` sin ORM. Te paso como referencia el archivo `cursos-repository.js` para que sigas el mismo estilo y patrón de consultas parametrizadas.
+
+Necesito que primero me generes solo el archivo `materias-repository.js` para una tabla `materias` con los campos `id`, `nombre`, `carga_horaria`.
+
+Incluí los métodos: `getAllAsync`, `getByIdAsync`, `createAsync`, `updateAsync` y `deleteByIdAsync`.
+
+Restricciones: sin ORM, sin dependencias nuevas, sin cambiar la estructura del proyecto y usando placeholders `$1`, `$2` para prevenir SQL Injection.
+Perfecto, siguiendo el mismo patrón de tu cursos-repository.js, aquí tienes el archivo materias-repository.js implementado con consultas parametrizadas usando pg y ES modules:
+
+js
+// materias-repository.js
+import { pool } from '../db/pg-connection.js';
+
+export async function getAllAsync() {
+  const query = 'SELECT id, nombre, carga_horaria FROM materias ORDER BY id';
+  const { rows } = await pool.query(query);
+  return rows;
+}
+
+export async function getByIdAsync(id) {
+  const query = 'SELECT id, nombre, carga_horaria FROM materias WHERE id = $1';
+  const values = [id];
+  const { rows } = await pool.query(query, values);
+  return rows[0] || null;
+}
+
+export async function createAsync({ nombre, carga_horaria }) {
+  const query = `
+    INSERT INTO materias (nombre, carga_horaria)
+    VALUES ($1, $2)
+    RETURNING id, nombre, carga_horaria
+  `;
+  const values = [nombre, carga_horaria];
+  const { rows } = await pool.query(query, values);
+  return rows[0];
+}
+
+export async function updateAsync(id, { nombre, carga_horaria }) {
+  const query = `
+    UPDATE materias
+    SET nombre = $1, carga_horaria = $2
+    WHERE id = $3
+    RETURNING id, nombre, carga_horaria
+  `;
+  const values = [nombre, carga_horaria, id];
+  const { rows } = await pool.query(query, values);
+  return rows[0] || null;
+}
+
+export async function deleteByIdAsync(id) {
+  const query = 'DELETE FROM materias WHERE id = $1 RETURNING id';
+  const values = [id];
+  const { rows } = await pool.query(query, values);
+  return rows[0] ? true : false;
+}
+Este archivo mantiene la misma estructura y estilo:
+
+Uso de async/await.
+
+Consultas parametrizadas con placeholders $1, $2, $3.
+
+Retorno de filas completas en createAsync y updateAsync.
+
+Retorno booleano en deleteByIdAsync para indicar éxito o fracaso.
+
+¿Querés que el siguiente paso sea armar el service (materias-service.js) con la lógica de negocio encima de este repositorio, o preferís que avancemos primero con el controller (materias-controller.js)?
+
+El `updateAsync` que me pasaste está mal. Si el cliente manda por ejemplo solo `{ "carga_horaria": 5 }`, el método me pisa `nombre` con `null` o con un valor vacío.
+
+Necesito que lo reescribas para que la actualización sea dinámica: solo incluya en el `SET` los campos que vienen definidos en el body, y que la consulta siga usando placeholders `$1`, `$2`, etc., para evitar SQL Injection.
+
+Mantén el mismo estilo del proyecto y no agregues nuevas dependencias.
+Tenés toda la razón: el updateAsync que te pasé antes pisa los campos no enviados. Para resolverlo, hay que construir dinámicamente el SET en base a las propiedades definidas en el body, manteniendo placeholders para prevenir SQL Injection. Aquí te dejo una versión corregida y más robusta:
+
+js
+// materias-repository.js
+import { pool } from '../db/pg-connection.js';
+
+export async function updateAsync(id, { nombre, carga_horaria }) {
+  const fields = [];
+  const values = [];
+  let index = 1;
+
+  if (nombre !== undefined) {
+    fields.push(`nombre = $${index}`);
+    values.push(nombre);
+    index++;
+  }
+
+  if (carga_horaria !== undefined) {
+    fields.push(`carga_horaria = $${index}`);
+    values.push(carga_horaria);
+    index++;
+  }
+
+  if (fields.length === 0) {
+    // No hay campos para actualizar
+    return null;
+  }
+
+  // Agregamos el id al final
+  values.push(id);
+
+  const query = `
+    UPDATE materias
+    SET ${fields.join(', ')}
+    WHERE id = $${index}
+    RETURNING id, nombre, carga_horaria
+  `;
+
+  const { rows } = await pool.query(query, values);
+  return rows[0] || null;
+}
+Detalles clave:
+Se arma un array fields con los fragmentos columna = $n solo si el campo está definido.
+
+Se mantiene el orden de los placeholders $1, $2, etc., en paralelo con el array values.
+
+Si no hay campos para actualizar, devuelve null directamente.
+
+El id siempre se agrega al final como último parámetro.
+
+De esta forma, si el cliente manda solo { "carga_horaria": 5 }, la consulta resultante será:
+
+sql
+UPDATE materias SET carga_horaria = $1 WHERE id = $2 RETURNING id, nombre, carga_horaria;
+Y no se pisa nombre.
+
+¿Querés que te prepare también una versión genérica que funcione para cualquier tabla con campos dinámicos, o preferís mantenerlo específico para materias?
+
+Ahora que el repository quedó bien, necesito la capa de servicio.
+
+Generame `materias-service.js` siguiendo exactamente el patrón de `cursos-service.js`, pero apuntando a `MateriasRepository`. No agregues lógica extra ni validaciones complejas; solo delegá la lógica a la capa inferior.
+
+Quiero los métodos: `getAllAsync`, `getByIdAsync`, `createAsync`, `updateAsync` y `deleteByIdAsync`.
+Perfecto, acá tenés el archivo materias-service.js siguiendo el mismo patrón que tu cursos-service.js, delegando toda la lógica al repositorio sin agregar dependencias ni validaciones extra:
+
+js
+// materias-service.js
+import * as MateriasRepository from '../repositories/materias-repository.js';
+
+export async function getAllAsync() {
+  return await MateriasRepository.getAllAsync();
+}
+
+export async function getByIdAsync(id) {
+  return await MateriasRepository.getByIdAsync(id);
+}
+
+export async function createAsync(materia) {
+  return await MateriasRepository.createAsync(materia);
+}
+
+export async function updateAsync(id, materia) {
+  return await MateriasRepository.updateAsync(id, materia);
+}
+
+export async function deleteByIdAsync(id) {
+  return await MateriasRepository.deleteByIdAsync(id);
+}
+Características:
+Importa el repositorio como módulo completo (* as MateriasRepository), igual que en tu cursos-service.js.
+
+Cada método del servicio es un simple wrapper que delega la llamada al repositorio correspondiente.
+
+Mantiene la nomenclatura Async en todos los métodos.
+
+No introduce lógica adicional ni dependencias nuevas.
+
+¿Querés que avancemos ahora con el controller (materias-controller.js) para completar el flujo REST, o preferís primero definir las rutas en tu materias-router.js?
+
+Necesito ahora el controller de `materias`.
+
+Tomá como referencia `cursos-controller.js` y armar el router con los endpoints: `GET /api/materias`, `GET /api/materias/:id`, `POST /api/materias`, `PUT /api/materias/:id` y `DELETE /api/materias/:id`.
+
+Usá `StatusCodes` de `http-status-codes`, manejá errores con `try/catch`, y respetá el mismo criterio de respuestas: 200, 201, 404 y 400.
+Perfecto, siguiendo el mismo patrón de tu cursos-controller.js, acá tenés el controller y router para materias con los endpoints solicitados. Se usan StatusCodes de http-status-codes, manejo de errores con try/catch, y las respuestas con los códigos adecuados:
+
+js
+// materias-controller.js
+import express from 'express';
+import { StatusCodes } from 'http-status-codes';
+import * as MateriasService from '../services/materias-service.js';
+
+const router = express.Router();
+
+// GET /api/materias
+router.get('/api/materias', async (req, res) => {
+  try {
+    const materias = await MateriasService.getAllAsync();
+    res.status(StatusCodes.OK).json(materias);
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+});
+
+// GET /api/materias/:id
+router.get('/api/materias/:id', async (req, res) => {
+  try {
+    const materia = await MateriasService.getByIdAsync(req.params.id);
+    if (!materia) {
+      return res.status(StatusCodes.NOT_FOUND).json({ error: 'Materia no encontrada' });
+    }
+    res.status(StatusCodes.OK).json(materia);
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+});
+
+// POST /api/materias
+router.post('/api/materias', async (req, res) => {
+  try {
+    const nuevaMateria = await MateriasService.createAsync(req.body);
+    res.status(StatusCodes.CREATED).json(nuevaMateria);
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+});
+
+// PUT /api/materias/:id
+router.put('/api/materias/:id', async (req, res) => {
+  try {
+    const materiaActualizada = await MateriasService.updateAsync(req.params.id, req.body);
+    if (!materiaActualizada) {
+      return res.status(StatusCodes.NOT_FOUND).json({ error: 'Materia no encontrada' });
+    }
+    res.status(StatusCodes.OK).json(materiaActualizada);
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+});
+
+// DELETE /api/materias/:id
+router.delete('/api/materias/:id', async (req, res) => {
+  try {
+    const eliminada = await MateriasService.deleteByIdAsync(req.params.id);
+    if (!eliminada) {
+      return res.status(StatusCodes.NOT_FOUND).json({ error: 'Materia no encontrada' });
+    }
+    res.status(StatusCodes.OK).json({ message: 'Materia eliminada correctamente' });
+  } catch (error) {
+    res.status(StatusCodes.BAD_REQUEST).json({ error: error.message });
+  }
+});
+
+export default router;
+Puntos clave:
+Se usa express.Router() para definir las rutas.
+
+Cada endpoint está envuelto en try/catch para capturar errores.
+
+Respuestas con 200 OK, 201 Created, 404 Not Found y 400 Bad Request según corresponda.
+
+Delegación directa a la capa de servicio (MateriasService).
+
+¿Querés que te arme también el archivo materias-router.js separado (solo con las rutas y exportando el router), o preferís mantenerlo integrado en el controller como en este ejemplo?
+
+Perfecto. Ahora conectá esta nueva ruta al servidor principal.
+
+En `server.js`, importá el controller de `materias` y montalo con `app.use("/api/materias", MateriasController);` sin romper el resto de los endpoints de `alumnos` y `cursos`.
+
+Además, revisá si el nombre del archivo `Materia` debería seguir el mismo estilo del proyecto para que no haya inconsistencias de imports.
+Excelente, para conectar la nueva ruta de materias al servidor principal sin romper el resto de los endpoints, tu server.js debería quedar algo así:
+
+js
+// server.js
+import express from 'express';
+import cors from 'cors';
+import AlumnosController from './controllers/alumnos-controller.js';
+import CursosController from './controllers/cursos-controller.js';
+import MateriasController from './controllers/materias-controller.js';
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// Endpoints existentes
+app.use('/api/alumnos', AlumnosController);
+app.use('/api/cursos', CursosController);
+
+// Nuevo endpoint de materias
+app.use('/api/materias', MateriasController);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+});
+Notas importantes:
+El MateriasController se importa desde ./controllers/materias-controller.js.
+
+Se monta con app.use("/api/materias", MateriasController);, lo que asegura que los endpoints definidos en el controller (por ejemplo GET /) se resuelvan como GET /api/materias.
+
+El estilo de nombres debe ser consistente: si tus otros archivos están en singular (cursos-controller.js, alumnos-controller.js), mantener materias-controller.js en plural es correcto porque representa la colección.
+
+Evitá inconsistencias como usar MateriaController en singular, ya que rompería el patrón de imports y podría generar confusión.
+
+De esta forma, tus tres módulos (alumnos, cursos, materias) quedan integrados de manera uniforme.
+
+¿Querés que te prepare también un ejemplo de cómo quedaría el materias-router.js separado del controller, para mantener la misma organización modular que seguramente tenés en cursos y alumnos?

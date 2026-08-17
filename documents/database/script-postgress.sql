@@ -4,6 +4,17 @@ CREATE TABLE cursos (
     nombre VARCHAR(75) NOT NULL
 );
 
+CREATE TABLE materias (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(75) NOT NULL,
+    carga_horaria INT NOT NULL
+);
+
+INSERT INTO materias (nombre, carga_horaria) VALUES ('Matemática', 4);
+INSERT INTO materias (nombre, carga_horaria) VALUES ('Historia', 3);
+INSERT INTO materias (nombre, carga_horaria) VALUES ('Programación', 5);
+INSERT INTO materias (nombre, carga_horaria) VALUES ('Física', 4);
+
 -- Tabla alumnos
 CREATE TABLE alumnos (
     id SERIAL PRIMARY KEY,
