@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import MateriasService from './../services/materias-service.js';
+import { authMiddleware } from './../middlewares/auth-middleware.js';
 
 const router = Router();
 const currentService = new MateriasService();
@@ -34,7 +35,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-router.post('', async (req, res) => {
+router.post('', authMiddleware, async (req, res) => {
     try {
         const entity = req.body;
         const newId = await currentService.createAsync(entity);
@@ -49,7 +50,7 @@ router.post('', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const entity = req.body;
@@ -70,7 +71,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
     try {
         const id = req.params.id;
         const rowCount = await currentService.deleteByIdAsync(id);

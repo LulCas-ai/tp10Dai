@@ -3,6 +3,7 @@ import express from "express";	// hacer npm i express
 import cors from "cors";	// hacer npm i cors
 
 // Controllers
+import AuthController from "./controllers/auth-controller.js";
 import AlumnosController from "./controllers/alumnos-controller.js"
 import CursosController from "./controllers/cursos-controller.js"
 import MateriasController from "./controllers/materias-controller.js";
@@ -14,7 +15,10 @@ const port = process.env.PORT || 3000;  // si no esta definido en el archivo .en
 app.use(cors());         // Middleware de CORS
 app.use(express.json()); // Middleware para parsear y comprender JSON
 
-// Endpoints (todos los Routers)
+// Endpoints públicos
+app.use("/api/auth", AuthController);
+
+// Endpoints con acceso a lectura pública y escritura protegida
 app.use("/api/alumnos", AlumnosController);
 app.use("/api/cursos", CursosController);
 app.use("/api/materias", MateriasController);
